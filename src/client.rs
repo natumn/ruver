@@ -1,8 +1,16 @@
+extern crate hyper;
+extern crate futures;
+extern crate tokio_core;
+
 use std::net::TcpListener;
 use std::thread;
-use std::io::{Read, Write};
-use std::io;
+use std::io::{self, Read, Write};
 
+use futures::{Future, Stream};
+use hyper::Client;
+use tokio_core::reactor::Core;
+
+/*
 pub fn server_start() -> io::Result<()> {
     let listen = TcpListener::bind("127.0.0.1:8080")?;
 
@@ -29,10 +37,17 @@ pub fn server_start() -> io::Result<()> {
     }
     Ok(())
 }
+*/
 
 fn main() {
-    match server_start() {
-        Ok(()) => (),
-        Err(err) => println!("{:?}", err),
-    }
+    let mut core = Core::new()?;
+    let client = Client::new(&core.handle());
+    let uri = "http://httpbin.org/ip".parse()?;
+    let work = client.get(uri).and_then(|res| {
+        println!("Response: {}", res.status());
+        res.body().for_each(|chunk| {
+            io::stdout().write_all(&chunk).map_err(From::from)
+        })
+    });
+    core.run(work)?;
 }
